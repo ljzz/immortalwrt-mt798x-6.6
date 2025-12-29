@@ -1,0 +1,395 @@
+name: Build N60 Pro High Power Firmware
+
+on:
+  # 手动触发编译
+  workflow_dispatch:
+    inputs:
+      clean_build:
+        description: '执行全新编译 (耗时更长)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      update_feeds:
+        description: '更新软件源'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+  
+  # 定时编译 (每周日凌晨3点 UTC，北京时间11点)
+  schedule:
+    - cron: '0 3 * * 0'
+  
+  # 当配置文件变更时自动编译
+  push:
+    branches: [ main, master ]
+    paths:
+      - '.github/workflows/**'
+      - 'configs/**'
+  
+  # 允许从外部仓库触发
+  repository_dispatch:
+    types: [build_request]
+
+# 环境变量配置
+env:
+  # 237 源码地址
+  SOURCE_REPO: "https://github.com/padavanonly/immortalwrt-mt798x-24.10"
+  SOURCE_BRANCH: "main"
+  
+  # 高功率配置文件地址 (RAW 格式)
+  HIGH_POWER_CONFIG: "https://raw.githubusercontent.com/padavanonly/immortalwrt-mt798x-6.6/2410/defconfig/nx60pro-ipailna-high-power.config"
+  
+  # 编译目录
+  BUILD_DIR: "${{ github.workspace }}/immortalwrt"
+  
+  # 目标设备 (N60 Pro 对应 GL-MT6000)
+  TARGET_SUBTARGET: "mediatek/mt7986"
+  TARGET_PROFILE: "glinet_gl-mt6000"
+  
+  # 编译配置
+  MAKE_JOBS: "$(($(nproc) + 1))"
+  CCACHE_MAX_SIZE: "2G"
+  BUILD_TIMEOUT: "240"
+
+jobs:
+  prepare:
+    name: 准备编译环境
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    
+    outputs:
+      cache_key: ${{ steps.cache-key.outputs.key }}
+    
+    steps:
+    - name: 生成缓存键
+      id: cache-key
+      run: |
+        TIMESTAMP=$(date +%Y%m%d-%H%M)
+        echo "key=mt7986-n60pro-$TIMESTAMP-${{ github.sha }}" >> $GITHUB_OUTPUT
+        
+    - name: 配置工作空间
+      run: |
+        echo "工作目录: ${{ github.workspace }}"
+        echo "编译目录: $BUILD_DIR"
+        mkdir -p ${{ github.workspace }}/artifacts
+
+  setup:
+    name: 设置编译环境
+    needs: prepare
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    
+    steps:
+    - name: 检出工作流仓库
+      uses: actions/checkout@v4
+      with:
+        path: workflow-repo
+
+    - name: 安装编译依赖
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          ccache \
+          clang \
+          flex \
+          bison \
+          g++ \
+          gawk \
+          gcc-multilib \
+          gettext \
+          git \
+          libncurses5-dev \
+          libssl-dev \
+          python3 \
+          python3-distutils \
+          python3-pip \
+          python3-setuptools \
+          rsync \
+          unzip \
+          zlib1g-dev \
+          file \
+          wget \
+          curl \
+          jq \
+          xxd \
+          time \
+          subversion \
+          mercurial \
+          gperf \
+          zip \
+          help2man \
+          texinfo \
+          libtool \
+          libtool-bin \
+          autoconf \
+          automake \
+          pkg-config \
+          libc6-dev \
+          libgmp-dev \
+          libmpc-dev \
+          libmpfr-dev
+
+    - name: 设置 ccache
+      uses: hendrikmuhs/ccache-action@v1.3
+      with:
+        key: ${{ needs.prepare.outputs.cache_key }}
+        max-size: ${{ env.CCACHE_MAX_SIZE }}
+        save: true
+
+    - name: 克隆 237 源码
+      run: |
+        echo "正在克隆 237 源码..."
+        git clone --depth 1 --branch "$SOURCE_BRANCH" "$SOURCE_REPO" "$BUILD_DIR"
+        cd "$BUILD_DIR"
+        echo "源码版本: $(git log -1 --oneline)"
+
+    - name: 下载高功率配置文件
+      run: |
+        echo "正在下载高功率配置文件..."
+        cd "$BUILD_DIR"
+        
+        # 下载高功率配置文件
+        curl -L -o .config "$HIGH_POWER_CONFIG"
+        
+        # 验证配置文件
+        if [ -f ".config" ]; then
+          echo "✅ 配置文件下载成功"
+          echo "文件大小: $(wc -l < .config) 行"
+          echo "前10行配置:"
+          head -10 .config
+        else
+          echo "❌ 配置文件下载失败"
+          exit 1
+        fi
+
+    - name: 配置 N60 Pro 专用设置
+      run: |
+        cd "$BUILD_DIR"
+        
+        echo "正在配置 N60 Pro 专用设置..."
+        
+        # 确保只编译 GL-MT6000 (N60 Pro)
+        sed -i '/CONFIG_TARGET_DEVICE_mediatek_mt7986_DEVICE_/d' .config
+        
+        # 启用 GL-MT6000
+        echo "CONFIG_TARGET_DEVICE_mediatek_mt7986_DEVICE_glinet_gl-mt6000=y" >> .config
+        
+        # 禁用其他设备
+        echo "# CONFIG_TARGET_DEVICE_mediatek_mt7986_DEVICE_tplink_tl-xdr6086 is not set" >> .config
+        echo "# CONFIG_TARGET_DEVICE_mediatek_mt7986_DEVICE_tplink_tl-xdr6088 is not set" >> .config
+        echo "# CONFIG_TARGET_DEVICE_mediatek_mt7986_DEVICE_xiaomi_redmi-router-ax6000 is not set" >> .config
+        echo "# CONFIG_TARGET_DEVICE_mediatek_mt7986_DEVICE_xiaomi_redmi-router-ax6000-stock is not set" >> .config
+        
+        # 禁用多设备编译
+        sed -i 's/CONFIG_TARGET_MULTI_PROFILE=y/# CONFIG_TARGET_MULTI_PROFILE is not set/' .config
+        
+        echo "✅ N60 Pro 配置完成"
+
+    - name: 更新软件源
+      if: github.event.inputs.update_feeds != 'false'
+      run: |
+        cd "$BUILD_DIR"
+        echo "正在更新软件源..."
+        
+        # 更新 feeds
+        ./scripts/feeds update -a
+        
+        # 安装所有包
+        ./scripts/feeds install -a
+        
+        echo "✅ 软件源更新完成"
+
+    - name: 保存编译环境
+      uses: actions/upload-artifact@v4
+      with:
+        name: prepared-source
+        path: ${{ env.BUILD_DIR }}
+        retention-days: 1
+
+  compile:
+    name: 编译固件
+    needs: [prepare, setup]
+    runs-on: ubuntu-22.04
+    timeout-minutes: ${{ env.BUILD_TIMEOUT }}
+    
+    steps:
+    - name: 恢复 ccache
+      uses: hendrikmuhs/ccache-action@v1.3
+      with:
+        key: ${{ needs.prepare.outputs.cache_key }}
+        max-size: ${{ env.CCACHE_MAX_SIZE }}
+        restore: true
+
+    - name: 恢复源码
+      uses: actions/download-artifact@v4
+      with:
+        name: prepared-source
+        path: ${{ github.workspace }}
+
+    - name: 生成默认配置
+      run: |
+        cd "$BUILD_DIR"
+        echo "正在生成默认配置..."
+        make defconfig
+        
+        # 显示配置差异
+        echo "=== 配置差异 ==="
+        ./scripts/diffconfig.sh
+
+    - name: 下载软件包
+      run: |
+        cd "$BUILD_DIR"
+        echo "正在下载软件包..."
+        
+        # 尝试并行下载，失败后重试
+        make download -j$(nproc) || {
+          echo "并行下载失败，尝试单线程下载..."
+          make download -j1
+        }
+        
+        # 清理损坏的小文件
+        find dl -size -1024c -exec rm -f {} \; 2>/dev/null || true
+        
+        echo "✅ 软件包下载完成"
+
+    - name: 编译固件
+      run: |
+        cd "$BUILD_DIR"
+        
+        # 记录开始时间
+        START_TIME=$(date +%s)
+        echo "编译开始时间: $(date)"
+        
+        # 判断是否执行全新编译
+        if [ "${{ github.event.inputs.clean_build }}" = "true" ]; then
+          echo "🧹 执行全新编译..."
+          make clean
+          make download -j$(nproc)
+        fi
+        
+        echo "🚀 开始编译 N60 Pro 高功率固件..."
+        echo "使用线程数: $MAKE_JOBS"
+        
+        # 编译固件 (V=s 显示详细输出)
+        make -j$MAKE_JOBS V=s 2>&1 | tee build.log
+        
+        # 记录结束时间
+        END_TIME=$(date +%s)
+        DURATION=$((END_TIME - START_TIME))
+        
+        echo "========================================"
+        echo "✅ 编译完成!"
+        echo "总耗时: $(($DURATION / 60))分钟 $(($DURATION % 60))秒"
+        echo "完成时间: $(date)"
+        echo "========================================"
+
+    - name: 检查编译结果
+      run: |
+        cd "$BUILD_DIR"
+        
+        echo "检查编译结果..."
+        
+        # 检查固件文件
+        if ls bin/targets/$TARGET_SUBTARGET/*.bin 1> /dev/null 2>&1; then
+          echo "✅ 固件文件生成成功!"
+          echo "生成的固件:"
+          ls -la bin/targets/$TARGET_SUBTARGET/*.bin
+        else
+          echo "❌ 未找到固件文件!"
+          echo "目录内容:"
+          ls -la bin/targets/$TARGET_SUBTARGET/ || true
+          exit 1
+        fi
+
+    - name: 上传固件
+      uses: actions/upload-artifact@v4
+      with:
+        name: n60pro-highpower-firmware
+        path: |
+          ${{ env.BUILD_DIR }}/bin/targets/${{ env.TARGET_SUBTARGET }}/*.bin
+          ${{ env.BUILD_DIR }}/bin/targets/${{ env.TARGET_SUBTARGET }}/*.manifest
+        retention-days: 30
+        if-no-files-found: error
+
+    - name: 上传软件包
+      uses: actions/upload-artifact@v4
+      with:
+        name: n60pro-packages
+        path: |
+          ${{ env.BUILD_DIR }}/bin/targets/${{ env.TARGET_SUBTARGET }}/packages/*
+        retention-days: 7
+
+    - name: 上传编译日志
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs
+        path: |
+          ${{ env.BUILD_DIR }}/build.log
+          ${{ env.BUILD_DIR }}/.config
+          ${{ env.BUILD_DIR }}/config.buildinfo
+        retention-days: 7
+
+    - name: 创建 GitHub Release
+      if: success() && github.event_name == 'workflow_dispatch'
+      uses: softprops/action-gh-release@v1
+      with:
+        name: "N60 Pro 高功率固件 v${{ github.run_number }}"
+        tag_name: "n60pro-highpower-${{ github.run_number }}"
+        body: |
+          # N60 Pro 高功率固件
+          
+          ## 固件信息
+          - **编译时间**: ${{ fromJSON('{"date": "'$(date)'"}').date }}
+          - **源码版本**: 237's immortalwrt-mt798x-24.10
+          - **配置文件**: nx60pro-ipailna-high-power.config
+          - **编译编号**: ${{ github.run_number }}
+          
+          ## 设备信息
+          - **型号**: GL.iNet GL-MT6000 (N60 Pro)
+          - **芯片**: MediaTek MT7986
+          - **无线**: MT7976 (iPaiLNA 高功率)
+          
+          ## 刷机说明
+          1. 进入路由器后台
+          2. 选择系统升级
+          3. 上传本固件
+          4. 保留配置(可选)
+          5. 开始刷机
+          
+          ⚠️ **注意**: 刷机有风险，请确保设备型号正确！
+          
+          ## 更新日志
+          - 使用 237 最新源码编译
+          - 启用 iPaiLNA 高功率驱动
+          - 优化无线性能
+        draft: false
+        prerelease: false
+        files: ${{ env.BUILD_DIR }}/bin/targets/${{ env.TARGET_SUBTARGET }}/*.bin
+
+  notify:
+    name: 通知结果
+    needs: compile
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+    - name: 编译结果通知
+      run: |
+        echo "编译作业状态: ${{ needs.compile.result }}"
+        
+        if [ "${{ needs.compile.result }}" = "success" ]; then
+          echo "🎉 N60 Pro 高功率固件编译成功!"
+          echo "固件已上传到 Artifacts"
+        else
+          echo "❌ N60 Pro 高功率固件编译失败!"
+          echo "请查看编译日志排查问题"
+        fi
