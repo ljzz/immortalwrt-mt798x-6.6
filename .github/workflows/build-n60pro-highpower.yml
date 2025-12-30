@@ -39,8 +39,8 @@ on:
 # 环境变量配置
 env:
   # 237 源码地址
-  SOURCE_REPO: "https://github.com/padavanonly/immortalwrt-mt798x-24.10"
-  SOURCE_BRANCH: "main"
+  SOURCE_REPO: "https://github.com/ljzz/immortalwrt-mt798x-6.6"
+  SOURCE_BRANCH: "openwrt-24.10-6.6"
   
   # 高功率配置文件地址 (RAW 格式)
   HIGH_POWER_CONFIG: "https://raw.githubusercontent.com/padavanonly/immortalwrt-mt798x-6.6/2410/defconfig/nx60pro-ipailna-high-power.config"
