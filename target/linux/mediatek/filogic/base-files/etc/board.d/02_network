@@ -37,6 +37,9 @@ mediatek_setup_interfaces()
 	arcadyan,mozart)
 		ucidef_set_interfaces_lan_wan "lan0 eth1" eth2
 		;;
+	airpi,ap3000m)
+		ucidef_set_interfaces_lan_wan eth0 eth1
+		;;
 	huasifei,wh3000-pro|\
 	*Airpi*)
                 ucidef_set_interfaces_lan "eth0 eth1"
@@ -51,6 +54,7 @@ mediatek_setup_interfaces()
 	cudy,wr3000-v1|\
 	jcg,q30-pro|\
 	keenetic,kn3811|\
+	netis,nx32u|\
 	livinet,zr-3020|\
 	livinet,zr-3020-ubootmod|\
 	qihoo,360t7|\
@@ -185,6 +189,10 @@ mediatek_setup_macs()
 	local b0dat="$(l1dat if2dat ra0)"
 	local b1dat="$(l1dat if2dat rax0)"
 	case $board in
+	airpi,ap3000m)
+		lan_mac=$(macaddr_generate_from_mmc_cid mmcblk0)
+		wan_mac=$(macaddr_add "$lan_mac" 1)
+		;;
 	acer,predator-w6|\
 	acer,predator-w6d|\
 	acer,vero-w6m)

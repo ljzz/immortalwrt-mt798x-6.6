@@ -45,6 +45,7 @@ mercusys,mr90x-v1-ubi|\
 netcore,n60|\
 netcore,n60-pro|\
 netis,nx31|\
+netis,nx32u|\
 nokia,ea0326gmp|\
 qihoo,360t7|\
 routerich,ax3000-ubootmod|\
@@ -110,7 +111,8 @@ comfast,cf-e393ax)
 	;;
 cudy,tr3000-v1|\
 cudy,tr3000-v1-256mb|\
-cudy,tr3000-v1-ubootmod)
+cudy,tr3000-v1-ubootmod|\
+cudy,wbr3000uax-v1-ubootmod)
 	local envdev=/dev/mtd$(find_mtd_index "u-boot-env")
 	ubootenv_add_uci_config "$envdev" "0x0" "0x80000" "0x80000"
 	;;

@@ -6,6 +6,10 @@ board=$(board_name)
 board_config_update
 
 case $board in
+airpi,ap3000m)
+	ucidef_set_led_netdev "wlan2g" "WLAN2G" "airpi:2g" "rax0" "link"
+        ucidef_set_led_netdev "wlan5g" "WLAN5G" "airpi:5g" "ra0" "link"
+	;;
 *Airpi*)
 	ucidef_set_led_netdev "wlan2g" "WLAN2G" "airpi:2g" "rax0" "link"
         ucidef_set_led_netdev "wlan5g" "WLAN5G" "airpi:5g" "ra0" "link"
@@ -45,6 +49,16 @@ wavlink,wl-wn573hx3)
 	;;
 cudy,wr3000-v1)
 	ucidef_set_led_netdev "wan" "wan" "blue:wan" "wan"
+	;;
+cudy,wbr3000uax-v1|\
+cudy,wbr3000uax-v1-ubootmod)
+	ucidef_set_led_default "internet_off" "internet_off" "red:fault" "1"
+	ucidef_set_led_netdev "internet" "internet" "blue:wan-online" "wan" "link"
+	ucidef_set_led_netdev "wan" "wan" "blue:wan" "wan" "tx rx"
+	ucidef_set_led_default "lan_off" "lan_off" "red:wps" "1"
+	ucidef_set_led_netdev "lan" "lan" "blue:lan" "br-lan" "link tx rx"
+	ucidef_set_led_netdev "wifi2G" "wifi2G" "blue:wlan-2ghz" "ra0"
+	ucidef_set_led_netdev "wifi5G" "wifi5G" "blue:wlan-5ghz" "rax0"
 	;;
 glinet,gl-x3000|\
 glinet,gl-xe3000)
@@ -101,6 +115,13 @@ netgear,wax220)
 	;;
 netis,nx31)
 	ucidef_set_led_netdev "wan" "wan" "blue:wan" "eth1" "link tx rx"
+	;;
+netis,nx32u)
+	ucidef_set_led_netdev "internet" "internet" "green:wan-online" "wan" "link"
+	ucidef_set_led_default "wps_off" "wps_off" "green:wps" "0"
+	ucidef_set_led_default "usb" "usb" "green:usb" "0"
+	ucidef_set_led_netdev "wifi2G" "wifi2G" "green:wlan-2ghz" "ra0"
+	ucidef_set_led_netdev "wifi5G" "wifi5G" "green:wlan-5ghz" "rax0"
 	;;
 openembed,som7981)
 	ucidef_set_led_netdev "lanact" "LANACT" "amber:lan" "eth1" "rx tx"

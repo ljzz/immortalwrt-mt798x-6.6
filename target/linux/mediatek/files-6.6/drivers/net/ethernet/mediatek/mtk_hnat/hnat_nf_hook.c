@@ -1005,10 +1005,8 @@ static unsigned int do_hnat_cpu_to_ge(struct sk_buff *skb)
 {
 	if (unlikely(skb_shinfo(skb)->frag_list))
                 return -1;
-	if (unlikely(skb_headroom(skb) < (FOE_INFO_LEN + ETH_HLEN))) {
-                if(unlikely(skb_cow(skb, FOE_INFO_LEN + ETH_HLEN)))
-                return -1;
-        }
+	if (unlikely(skb->mark == HNAT_EXCEPTION_TAG))
+				return -1;
 	skb_hnat_alg(skb) = 0;
 	skb_hnat_magic_tag(skb) = HNAT_MAGIC_TAG;
 	skb_hnat_filled(skb) = 0;

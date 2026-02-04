@@ -119,7 +119,6 @@ void hnat_cache_clr(u32 ppe_id)
 	u32 cah_en;
 	if (ppe_id >= CFG_PPE_NUM)
 		return;
-	spin_lock_bh(&hnat_priv->cah_lock);
 	/* disable table learning */
 	flow_cfg = readl(hnat_priv->ppe_base[ppe_id] + PPE_FLOW_CFG);
 	writel(0, hnat_priv->ppe_base[ppe_id] + PPE_FLOW_CFG);
@@ -145,7 +144,6 @@ void hnat_cache_clr(u32 ppe_id)
 	cr_set_field(hnat_priv->ppe_base[ppe_id] + PPE_TB_CFG, SCAN_MODE, scan_mode);
 	/* restore table learning */
 	writel(flow_cfg, hnat_priv->ppe_base[ppe_id] + PPE_FLOW_CFG);
-	spin_unlock_bh(&hnat_priv->cah_lock);
 	if (debug_level >= 2)
 		pr_info("%s: Clear cache of PPE%d\n", __func__, ppe_id);
 }
