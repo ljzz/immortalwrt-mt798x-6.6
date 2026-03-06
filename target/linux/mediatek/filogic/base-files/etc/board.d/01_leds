@@ -14,6 +14,10 @@ airpi,ap3000m)
 	ucidef_set_led_netdev "wlan2g" "WLAN2G" "airpi:2g" "rax0" "link"
         ucidef_set_led_netdev "wlan5g" "WLAN5G" "airpi:5g" "ra0" "link"
 	;;
+bt,r320)
+	ucidef_set_led_netdev "wlan2g" "2.4G" "green:wlan-2ghz" "ra0"
+	ucidef_set_led_netdev "wlan5g" "5G" "green:wlan-5ghz" "rax0"
+	;;
 abt,asr3000)
 	ucidef_set_led_netdev "wan" "WAN" "green:wan" "eth1"
 	ucidef_set_led_netdev "wlan2g" "WLAN2G" "green:wlan-2ghz" "phy0-ap0"

@@ -255,6 +255,18 @@ define U-Boot/mt7981_cmcc_a10
   DEPENDS:=+trusted-firmware-a-mt7981-spim-nand-ddr3
 endef
 
+define U-Boot/mt7981_bt_r320
+  NAME:=BT R320
+  BUILD_SUBTARGET:=filogic
+  BUILD_DEVICES:=bt_r320
+  UBOOT_CONFIG:=mt7981_bt_r320
+  UBOOT_IMAGE:=u-boot.fip
+  BL2_BOOTDEV:=emmc
+  BL2_SOC:=mt7981
+  BL2_DDRTYPE:=ddr4
+  DEPENDS:=+trusted-firmware-a-mt7981-emmc-ddr4
+endef
+
 define U-Boot/mt7981_cmcc_rax3000m-emmc
   NAME:=CMCC RAX3000M
   BUILD_SUBTARGET:=filogic
